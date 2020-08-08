@@ -2,7 +2,12 @@
   <div id="home">
     <nav-bar class="home-nav"><div slot="center">购物街</div></nav-bar>
 
-    <scroll class="content" ref="scroll">
+    <scroll class="content"
+            ref="scroll"
+            :probe-type="3"
+            :pull-up-load="true"
+            @scroll="contentScroll"
+            @pullingUp="loadMore">
       <home-swiper :banners="banners"></home-swiper>
       <recommend-view :recommends="recommends"></recommend-view>
       <feature-view></feature-view>
@@ -13,7 +18,7 @@
     </scroll>
 
 <!--    @click 无法监听组件事件；.native可以监听组件根元素的原生事件-->
-    <back-top @click.native="backClick"></back-top>
+    <back-top @click.native="backClick" v-show="isShowBackTop"></back-top>
   </div>
 </template>
 
@@ -43,7 +48,8 @@
           'new': {page: 0, list: []},
           'sell': {page: 0, list: []},
         },
-        currentType: 'pop'
+        currentType: 'pop',
+        isShowBackTop: false
       }
     },
     computed: {
@@ -81,11 +87,38 @@
       // getHomeGoods('pop', 1).then(res => {
       //   console.log(res);
       // })
+
+
+    },
+    mounted() {
+      const refresh = this.debounce(this.$refs.scroll.refresh, 200)
+
+      // 3、监听item中时间加载完成
+      this.$bus.$on('itemImageLoad', () => {
+        // console.log('------');
+        // this.$refs.scroll.refresh()
+
+        refresh()
+      })
     },
     methods: {
       /**
        * 事件监听相关方法
        */
+      debounce(func, delay) {
+        let timer = null
+
+        return function (...args) {
+          if (timer) clearTimeout(timer)
+
+          timer = setTimeout(() => {
+            func.apply(this, args)
+          }, delay)
+        }
+      },
+
+
+
       tabClick(index) {
         console.log(index);
         switch (index) {
@@ -102,6 +135,13 @@
       },
       backClick() {
         this.$refs.scroll.scrollTo(0, 0)
+      },
+      contentScroll(position) {
+        // console.log(position);
+        this.isShowBackTop = (-position.y) > 1000
+      },
+      loadMore() {
+        this.getHomeGoods(this.currentType)
       },
 
 
@@ -122,6 +162,8 @@
         getHomeGoods(type, page).then(res => {
           this.goods[type].list.push(...res.data.list)
           this.goods[type].page += 1
+
+          this.$refs.scroll.finishPullUp()
           // console.log(res);
           // console.log(res.data.list);
         })
